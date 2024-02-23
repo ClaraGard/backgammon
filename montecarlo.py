@@ -3,13 +3,16 @@ import math
 import random
 import copy
 import hashlib
+import time
 
 # NRPA 
 # missing incrementation of visited_boards + points + play_game fonction
 
 def code(board, move, player):
     board_copy = copy.deepcopy(board)
-    board_copy = Backgammon.update_board(board_copy, move, player)
+    if len(move) != 0:
+        for m in move:
+            board_copy = Backgammon.update_board(board_copy, m, player)
     text = ''.join(map(str, board_copy))
 
     sha1 = hashlib.sha1()
@@ -18,7 +21,7 @@ def code(board, move, player):
     return sha1.hexdigest()
 
 def randomMove(board, dice, policy, player):
-    moves = Backgammon.legal_moves(board, dice, player)
+    moves = Backgammon.legal_moves(board, dice, player)[0]
     z = 0.0
     for m in moves:
         code_value = code(board, m, player)
@@ -34,17 +37,22 @@ def randomMove(board, dice, policy, player):
         
 def playout (board, dice, policy, player):
     board_copy = copy.deepcopy(board)
+    sequence = []
     while not Backgammon.game_over(board_copy):
         move = randomMove(board, dice, policy, player)
-        board_copy = Backgammon.update_board(board_copy, move, player)
+        sequence.append(move)
+        if len(move) != 0:
+            for m in move:
+                board_copy = Backgammon.update_board(board_copy, m, player)
         player *= -1
-    return board_copy
+    score = Backgammon.winner_gains(-player, board_copy)
+    return score, sequence
 
 def adapt(policy, sequence, dice, player, alpha = 1):
     board = Backgammon.init_board()
     polp = copy.deepcopy(policy)
     for best in sequence:
-        moves = Backgammon.legal_moves(board, dice, player)
+        moves = Backgammon.legal_moves(board, dice, player)[0]
         z = 0.0
         for m in moves:
             code_value = code(board, m, player)
@@ -58,10 +66,12 @@ def adapt(policy, sequence, dice, player, alpha = 1):
             polp[code_value] -= alpha*math.exp(policy[code_value])/z
         code_value = code(board, best, player)
         polp[code_value] += alpha
-        board = Backgammon.update_board(board, best, player)
+        if len(best) != 0:
+            for m in best:
+                board_copy = Backgammon.update_board(board_copy, m, player)
     return polp
 
-def nrpa(level, policy, player, dice, N = 100):
+def nrpa(level, policy, player, dice, N = 10):
     if level == 0:
         return playout(Backgammon.init_board(), dice, policy, player)
     best = -1000000.0
@@ -75,8 +85,13 @@ def nrpa(level, policy, player, dice, N = 100):
         policy = adapt(policy, seq, dice, player)
     return best, seq
 
+startTime = time.time()
 player = random.randint(0,1)*2-1
 dice = Backgammon.roll_dice()
+sc, s = nrpa(1, {}, player, dice)
+print(sc, s)
+runTime = time.time()-startTime
+print("runTime:", runTime)
 
 # Choisir MaxLegalMoves:
 # faire 1000 parties aléatoires, à chaque fois je prends le max du nombre de coups légaux possibles
