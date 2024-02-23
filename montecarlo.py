@@ -15,10 +15,7 @@ def code(board, move, player):
             board_copy = Backgammon.update_board(board_copy, m, player)
     text = ''.join(map(str, board_copy))
 
-    sha1 = hashlib.sha1()
-    sha1.update(text.encode('utf-8'))
-
-    return sha1.hexdigest()
+    return text
 
 def randomMove(board, dice, policy, player):
     moves = Backgammon.legal_moves(board, dice, player)[0]
@@ -34,17 +31,19 @@ def randomMove(board, dice, policy, player):
         sum = sum + math.exp(policy[code_value])
         if sum >= stop:
             return m
+    return []
         
 def playout (board, dice, policy, player):
     board_copy = copy.deepcopy(board)
     sequence = []
     while not Backgammon.game_over(board_copy):
-        move = randomMove(board, dice, policy, player)
+        move = randomMove(board_copy, dice, policy, player)
         sequence.append(move)
         if len(move) != 0:
             for m in move:
                 board_copy = Backgammon.update_board(board_copy, m, player)
         player *= -1
+        dice = Backgammon.roll_dice()
     score = Backgammon.winner_gains(-player, board_copy)
     return score, sequence
 
@@ -52,6 +51,10 @@ def adapt(policy, sequence, dice, player, alpha = 1):
     board = Backgammon.init_board()
     polp = copy.deepcopy(policy)
     for best in sequence:
+        best_code = code(board, best, player)
+        if not best_code in polp:
+            polp[best_code] = 0
+        polp[best_code] = polp[best_code] + alpha
         moves = Backgammon.legal_moves(board, dice, player)[0]
         z = 0.0
         for m in moves:
@@ -64,11 +67,9 @@ def adapt(policy, sequence, dice, player, alpha = 1):
             if polp.get(code_value) == None:
                 polp[code_value] = 0.0
             polp[code_value] -= alpha*math.exp(policy[code_value])/z
-        code_value = code(board, best, player)
-        polp[code_value] += alpha
         if len(best) != 0:
             for m in best:
-                board_copy = Backgammon.update_board(board_copy, m, player)
+                board = Backgammon.update_board(board, m, player)
     return polp
 
 def nrpa(level, policy, player, dice, N = 10):
