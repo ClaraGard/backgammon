@@ -60,6 +60,7 @@ def adapt(policy, state, sequence, dice, player, alpha = 1):
             polp[best_code] = 0
         polp[best_code] = polp[best_code] + alpha
         moves = Backgammon.legal_moves(board, dice, player)[0]
+        #we're doing a lot of illegal moves here since we don't reroll the dice
         print("legal moves length", len(moves))
         z = 0.0
         for m in moves:
