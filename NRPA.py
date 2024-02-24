@@ -13,7 +13,7 @@ def code(board, move, player):
     if len(move) != 0:
         for m in move:
             board_copy = Backgammon.update_board(board_copy, m, player)
-    text = ''.join(map(str, board_copy))
+    text = ''.join(map(str, board_copy))+str(player)
 
     return text
 
@@ -34,6 +34,7 @@ def randomMove(board, dice, policy, player):
     return []
         
 def playout (board, dice, policy, player):
+    print("playout")
     board_copy = copy.deepcopy(board)
     sequence = []
     while not Backgammon.game_over(board_copy):
@@ -45,17 +46,21 @@ def playout (board, dice, policy, player):
         player *= -1
         dice = Backgammon.roll_dice()
     score = Backgammon.winner_gains(-player, board_copy)
+    print("playout finish")
     return score, sequence
 
-def adapt(policy, sequence, dice, player, alpha = 1):
-    board = Backgammon.init_board()
+def adapt(policy, state, sequence, dice, player, alpha = 1):
+    print("adapt")
+    board = copy.deepcopy(state)
     polp = copy.deepcopy(policy)
+    print("sequence length", len(sequence))
     for best in sequence:
         best_code = code(board, best, player)
         if not best_code in polp:
             polp[best_code] = 0
         polp[best_code] = polp[best_code] + alpha
         moves = Backgammon.legal_moves(board, dice, player)[0]
+        print("legal moves length", len(moves))
         z = 0.0
         for m in moves:
             code_value = code(board, m, player)
@@ -70,26 +75,31 @@ def adapt(policy, sequence, dice, player, alpha = 1):
         if len(best) != 0:
             for m in best:
                 board = Backgammon.update_board(board, m, player)
+    print("adapt finish")
     return polp
 
-def nrpa(level, policy, player, dice, N = 10):
+def nrpa(level, policy, board, player, dice, N = 10):
     if level == 0:
-        return playout(Backgammon.init_board(), dice, policy, player)
+        return playout(board, dice, policy, player)
     best = -1000000.0
     seq = []
-    for _ in range(N):
+    for i in range(N):
+        print(i)
         pol = copy.deepcopy(policy)
-        sc, s = nrpa(level - 1, pol, player, dice)
+        sc, s = nrpa(level - 1, pol, board, player, dice)
         if sc > best: # this need to be changed also
             best = sc
             seq = s
-        policy = adapt(policy, seq, dice, player)
+        policy = adapt(policy, board, seq, dice, player)
+    print("policy length", len(policy))
     return best, seq
 
 startTime = time.time()
+board = Backgammon.init_board()
 player = random.randint(0,1)*2-1
 dice = Backgammon.roll_dice()
-sc, s = nrpa(1, {}, player, dice)
+print(dice)
+sc, s = nrpa(2, {}, board, player, dice)
 print(sc, s)
 runTime = time.time()-startTime
 print("runTime:", runTime)
