@@ -6,12 +6,13 @@ Backgammon interface
 Run this program to play a game of Backgammon
 """
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 import random
+import copy
 
 def init_board():
     # initializes the game board
+
     board = np.zeros(29)
     board[1] = -2
     board[12] = -5
@@ -21,16 +22,17 @@ def init_board():
     board[8] = 3
     board[13] = 5
     board[24] = 2
+
     return board
 
 def roll_dice():
     # rolls the dice
-    dice = np.random.randint(1, 7, 2)
     
-    return dice
+    return np.random.randint(1, 7, 2)
 
 def game_over(board):
-    # returns True if the game is over    
+    # returns True if the game is over   
+     
     return board[27] == 15 or board[28] == -15
     
 def pretty_print(board):
@@ -39,17 +41,15 @@ def pretty_print(board):
                  np.array2string(board[25:29]))
     print("board: \n", string)
       
-def legal_move(board, die, player):
-    # finds legal moves for a board and one dice
-    # inputs are some BG-board, the number on the die and which player is up
-    # outputs all the moves (just for the one die)
+def legal_move(board, dice, player):
+    # finds legal moves (from, to) for a board and one dice, returns empty list if none
+
     possible_moves = []
 
     if player == 1:
-        
         # dead piece, needs to be brought back to life
         if board[25] > 0: 
-            start_pip = 25 - die
+            start_pip = 25 - dice
             if board[start_pip] > -2:
                 possible_moves.append(np.array([25, start_pip]))
                 
@@ -57,20 +57,20 @@ def legal_move(board, die, player):
         else:
             # adding options if player is bearing off
             if sum(board[7:25] > 0) == 0: 
-                if (board[die] > 0):
-                    possible_moves.append(np.array([die, 27]))
+                if (board[dice] > 0):
+                    possible_moves.append(np.array([dice, 27]))
                     
                 elif not game_over(board): # smá fix
                     # everybody's past the dice throw?
                     s = np.max(np.where(board[1:7] > 0)[0] + 1)
-                    if s < die:
+                    if s < dice:
                         possible_moves.append(np.array([s, 27]))
                     
             possible_start_pips = np.where(board[0:25] > 0)[0]
 
             # finding all other legal options
             for s in possible_start_pips:
-                end_pip = s-die
+                end_pip = s-dice
                 if end_pip > 0:
                     if board[end_pip] > -2:
                         possible_moves.append(np.array([s, end_pip]))
@@ -78,7 +78,7 @@ def legal_move(board, die, player):
     elif player == -1:
         # dead piece, needs to be brought back to life
         if board[26] < 0: 
-            start_pip = die
+            start_pip = dice
             if board[start_pip] < 2:
                 possible_moves.append(np.array([26, start_pip]))
                 
@@ -86,18 +86,18 @@ def legal_move(board, die, player):
         else:
             # adding options if player is bearing off
             if sum(board[1:19] < 0) == 0: 
-                if (board[25 - die] < 0):
-                    possible_moves.append(np.array([25 - die, 28]))
+                if (board[25 - dice] < 0):
+                    possible_moves.append(np.array([25 - dice, 28]))
                 elif not game_over(board): # smá fix
                     # everybody's past the dice throw?
                     s = np.min(np.where(board[19:25] < 0)[0])
-                    if (6 - s) < die:
+                    if (6 - s) < dice:
                         possible_moves.append(np.array([19 + s, 28]))
 
             # finding all other legal options
             possible_start_pips = np.where(board[0:25] < 0)[0]
             for s in possible_start_pips:
-                end_pip = s + die
+                end_pip = s + dice
                 if end_pip < 25:
                     if board[end_pip] < 2:
                         possible_moves.append(np.array([s, end_pip]))
@@ -105,70 +105,60 @@ def legal_move(board, die, player):
     return possible_moves
 
 def legal_moves(board, dice, player):
-    # finds all possible moves and the possible board after-states
-    # inputs are the BG-board, the dices rolled and which player is up
-    # outputs the possible pair of moves (if they exists) and their after-states
+    # return all possible pair of legal moves if there exists, empty list otherwise
 
     moves = []
-    boards = []
 
     # try using the first dice, then the second dice
     possible_first_moves = legal_move(board, dice[0], player)
     for m1 in possible_first_moves:
-        temp_board = update_board(board,m1,player)
+        temp_board = update_board(board, m1, player)
         possible_second_moves = legal_move(temp_board, dice[1], player)
         for m2 in possible_second_moves:
-            moves.append(np.array([m1,m2]))
-            boards.append(update_board(temp_board, m2, player))
+            moves.append(np.array([m1, m2]))
         
     if dice[0] != dice[1]:
         # try using the second dice, then the first one
         possible_first_moves = legal_move(board, dice[1], player)
         for m1 in possible_first_moves:
-            temp_board = update_board(board,m1,player)
+            temp_board = update_board(board, m1, player)
             possible_second_moves = legal_move(temp_board, dice[0], player)
             for m2 in possible_second_moves:
-                moves.append(np.array([m1,m2]))
-                boards.append(update_board(temp_board, m2, player))
+                moves.append(np.array([m1, m2]))
             
     # if there's no pair of moves available, allow one move:
-    if len(moves)==0: 
+    if len(moves) == 0: 
         # first dice:
         possible_first_moves = legal_move(board, dice[0], player)
         for m in possible_first_moves:
             moves.append(np.array([m]))
-            boards.append(update_board(temp_board, m, player))
             
         # second dice:
         if dice[0] != dice[1]:
             possible_first_moves = legal_move(board, dice[1], player)
             for m in possible_first_moves:
                 moves.append(np.array([m]))
-                boards.append(update_board(temp_board, m, player))
             
-    return moves, boards 
+    return moves
 
 def update_board(board, move, player):
-    # updates the board
-    # inputs are some board, one move and the player
-    # outputs the updated board
-    board_to_update = np.copy(board) 
+    # updates the board (play a move)
 
-    # if the move is there
-    if len(move) > 0:
-        startPip = move[0]
-        endPip = move[1]
-        
-        # moving the dead piece if the move kills a piece
-        kill = board_to_update[endPip] == (-1*player)
-        
-        if kill:
-            board_to_update[endPip] = 0
-            jail = 25 + (player == 1)
-            board_to_update[jail] = board_to_update[jail] - player
-        
-        board_to_update[startPip] = board_to_update[startPip] - 1*player
-        board_to_update[endPip] = board_to_update[endPip] + player
+    board_to_update = copy.deepcopy(board) 
+
+    startPip = move[0]
+    endPip = move[1]
+    
+    # moving the dead piece if the move kills a piece
+    kill = board_to_update[endPip] == (-1*player)
+    
+    if kill:
+        board_to_update[endPip] = 0
+        jail = 25 + (player == 1)
+        board_to_update[jail] = board_to_update[jail] - player
+    
+    board_to_update[startPip] = board_to_update[startPip] - 1*player
+    board_to_update[endPip] = board_to_update[endPip] + player
 
     return board_to_update
 
@@ -187,31 +177,27 @@ def winner_gains(winner, board):
     return points
     
 def play_a_game(winners, beginners):
-    board = init_board() # initialize the board
-    player = np.random.randint(2)*2 - 1 # which player begins?
+    # simulate a game with randomized moves
+
+    board = init_board()
+    player = np.random.randint(2)*2 - 1
     beginner = player
-    
-    # play on
+    dice_rolls = 0
+
     while not game_over(board):
-        # roll dice
         dice = roll_dice()
+        dice_rolls += 1
             
         # make a move (2 moves if the same number appears on the dice)
-        for _ in range(1+int(dice[0] == dice[1])):
+        for _ in range(1 + int(dice[0] == dice[1])):
             board_copy = np.copy(board) 
 
             possible_moves = legal_moves(board_copy, dice, player)
-            
-            move = []
-            if len(possible_moves[0]) != 0:
-                move = random.choice(possible_moves[0])
-                
-            # update the board
-            if len(move) != 0:
+            if len(possible_moves) != 0:
+                move = random.choice(possible_moves)
                 for m in move:
                     board = update_board(board, m, player)
                                 
-                
         # players take turns 
         player = -player
 
@@ -227,7 +213,7 @@ def play_a_game(winners, beginners):
     else:
         beginners["blue"][0] += 1
 
-    winner = -1*player
+    winner = -player
     points = winner_gains(winner, board) 
     if winner == 1:
         winners["orange"][0] += 1
@@ -250,35 +236,42 @@ def play_a_game(winners, beginners):
         else:
             winners["blue"][3] += 1       
        
-    # return the winner
-    return winners, beginners
+    return winners, beginners, dice_rolls//2
     
 def main():
-    startTime = time.time()
+    games = 10000
 
-    nGames = 50
     winners = {"orange": [0, 0, 0, 0], "blue": [0, 0, 0, 0]} # Collecting stats of the games
     beginners = {"orange": [0, 0], "blue": [0,0]}
-    for _ in range(nGames):
-        winners, beginners= play_a_game(winners, beginners)
+    mean_dice_rolls = 0
+    mean_run_time = 0
+    
+    for _ in range(games):
+        startTime = time.time()
 
-    print(f"Out of {nGames} games between blue and orange:\n")
-    print(f"Player orange won {winners['orange'][0]} times and won " \
+        winners, beginners, dice_rolls = play_a_game(winners, beginners)
+        mean_dice_rolls += dice_rolls
+
+        runTime = time.time() - startTime
+        mean_run_time += runTime
+
+    mean_dice_rolls = mean_dice_rolls//games
+    mean_run_time = mean_run_time/games
+
+    print(f"Out of {games} games between blue and orange:\n")
+    print(f"Player orange won {winners['orange'][0]} times ({round(100*winners['orange'][0]/games, 2)}%) and won " \
           f"{winners['orange'][1] + winners['orange'][2]*2 + winners['orange'][3]*3} points.")
-    print(f"Player blue won {winners['blue'][0]} times and won " \
+    print(f"Player blue won {winners['blue'][0]} times ({round(100*winners['blue'][0]/games, 2)}%) and won " \
           f"{winners['blue'][1] + winners['blue'][2]*2 + winners['blue'][3]*3} points.\n")
     print(f"Player orange won {winners['orange'][1]} 1-point plays, {winners['orange'][2]} 2-point plays " \
           f"and {winners['orange'][3]} 3-point plays.")
     print(f"Player blue won {winners['blue'][1]} 1-point plays, {winners['blue'][2]} 2-point plays " \
           f"and {winners['blue'][3]} 3-point plays.\n")
-    print(f"Player orange started {beginners['orange'][0]} times and won " \
-          f"{100*beginners['orange'][1]/beginners['orange'][0]}% of started games.")
-    print(f"Player blue started {beginners['blue'][0]} times and won " \
-          f"{100*beginners['blue'][1]/beginners['blue'][0]}% of started games.\n")
-
-    runTime = time.time()-startTime
-    print("runTime:", runTime)
-    print("average time:", runTime/nGames)
+    print(f"Player orange started {beginners['orange'][0]} times ({round(100*beginners['orange'][0]/games, 2)}%) and won " \
+          f"{round(100*beginners['orange'][1]/beginners['orange'][0], 2)}% of started games.")
+    print(f"Player blue started {beginners['blue'][0]} times ({round(100*beginners['blue'][0]/games, 2)}%) and won " \
+          f"{round(100*beginners['blue'][1]/beginners['blue'][0], 2)}% of started games.\n")
+    print(f"On average, a game last {round(mean_run_time, 3)}s and is played in {mean_dice_rolls} dice rolls.\n")
     
 if __name__ == '__main__':
     main()
