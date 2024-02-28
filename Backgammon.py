@@ -6,6 +6,7 @@ Backgammon interface
 Run this program to play a game of Backgammon
 """
 import numpy as np
+import matplotlib.pyplot as plt
 import time
 import random
 import copy
@@ -163,25 +164,27 @@ def update_board(board, move, player):
     return board_to_update
 
 def winner_gains(winner, board):
-    points = 1
-
-    if winner == 1 and board[28] == 0:
-        points = 2
-        if sum(board[1:13]) < 0:
-            points = 3
-    elif winner == -1 and board[27] == 0:
-        points = 2
-        if sum(board[13:25]) > 0:
-            points = 3
+    # distribute points to winner according to status of final board.
+    if winner == 1:
+        points = 1
+        if board[28] == 0:
+            points = 2
+            if sum(board[1:13]) < 0:
+                points = 3
+    else:
+        points = -1
+        if board[27] == 0:
+            points = -2
+            if sum(board[13:25]) > 0:
+                points = -3
     
     return points
     
-def play_a_game(winners, beginners):
+def play_a_game(winners, nb_legal_moves = {}):
     # simulate a game with randomized moves
 
     board = init_board()
-    player = np.random.randint(2)*2 - 1
-    beginner = player
+    player = 1
     dice_rolls = 0
 
     while not game_over(board):
@@ -193,6 +196,19 @@ def play_a_game(winners, beginners):
             board_copy = np.copy(board) 
 
             possible_moves = legal_moves(board_copy, dice, player)
+
+            # Study of the distribution of number of legal moves
+            # nb_moves = len(possible_moves)
+            # if nb_moves >= 170:
+            #     print(dice)
+            #     print(player)
+            #     pretty_print(board_copy)
+
+            # if nb_moves not in nb_legal_moves.keys():
+            #     nb_legal_moves[nb_moves] = 1
+            # else:
+            #     nb_legal_moves[nb_moves] += 1
+
             if len(possible_moves) != 0:
                 move = random.choice(possible_moves)
                 for m in move:
@@ -208,17 +224,10 @@ def play_a_game(winners, beginners):
     #     pretty_print(board)
         
     # updates of statistics
-    if beginner == 1:
-        beginners["orange"][0] += 1
-    else:
-        beginners["blue"][0] += 1
-
     winner = -player
     points = winner_gains(winner, board) 
     if winner == 1:
         winners["orange"][0] += 1
-        if beginner == 1:
-            beginners["orange"][1] += 1
         if points == 1:
             winners["orange"][1] += 1
         elif points == 2:
@@ -227,38 +236,48 @@ def play_a_game(winners, beginners):
             winners["orange"][3] += 1
     else:
         winners["blue"][0] += 1
-        if beginner == -1:
-            beginners["blue"][1] += 1
-        if points == 1:
+        if points == -1:
             winners["blue"][1] += 1
-        elif points == 2:
+        elif points == -2:
             winners["blue"][2] += 1
         else:
             winners["blue"][3] += 1       
        
-    return winners, beginners, dice_rolls//2
+    return winners, dice_rolls/2, nb_legal_moves
     
 def main():
-    games = 10000
+    games = 100
 
     winners = {"orange": [0, 0, 0, 0], "blue": [0, 0, 0, 0]} # Collecting stats of the games
-    beginners = {"orange": [0, 0], "blue": [0,0]}
     mean_dice_rolls = 0
     mean_run_time = 0
+    nb_legal_moves = {}
     
     for _ in range(games):
         startTime = time.time()
 
-        winners, beginners, dice_rolls = play_a_game(winners, beginners)
+        winners, dice_rolls, nb_legal_moves = play_a_game(winners, nb_legal_moves)
         mean_dice_rolls += dice_rolls
 
         runTime = time.time() - startTime
         mean_run_time += runTime
 
-    mean_dice_rolls = mean_dice_rolls//games
+    mean_dice_rolls = mean_dice_rolls/games
     mean_run_time = mean_run_time/games
 
-    print(f"Out of {games} games between blue and orange:\n")
+    # Plotting the distribution of the number of legal moves
+    # nb_legal_moves = dict(sorted(nb_legal_moves.items()))
+    # max_key = max(nb_legal_moves.keys())
+    # completed_dict = {i: nb_legal_moves.get(i, 0) for i in range(max_key + 1)}
+    
+    # plt.bar(completed_dict.keys(), completed_dict.values(), color = 'blue')
+    # plt.xlabel('Number of legal moves')
+    # plt.ylabel('Distribution')
+    # plt.title(f'Distribution of the number of legal moves over {games} games (about {mean_dice_rolls*games} turns).')
+    # plt.grid(True)
+    # plt.show()
+
+    print(f"Out of {games} games between blue and orange, with orange always beginning:\n")
     print(f"Player orange won {winners['orange'][0]} times ({round(100*winners['orange'][0]/games, 2)}%) and won " \
           f"{winners['orange'][1] + winners['orange'][2]*2 + winners['orange'][3]*3} points.")
     print(f"Player blue won {winners['blue'][0]} times ({round(100*winners['blue'][0]/games, 2)}%) and won " \
@@ -267,11 +286,7 @@ def main():
           f"and {winners['orange'][3]} 3-point plays.")
     print(f"Player blue won {winners['blue'][1]} 1-point plays, {winners['blue'][2]} 2-point plays " \
           f"and {winners['blue'][3]} 3-point plays.\n")
-    print(f"Player orange started {beginners['orange'][0]} times ({round(100*beginners['orange'][0]/games, 2)}%) and won " \
-          f"{round(100*beginners['orange'][1]/beginners['orange'][0], 2)}% of started games.")
-    print(f"Player blue started {beginners['blue'][0]} times ({round(100*beginners['blue'][0]/games, 2)}%) and won " \
-          f"{round(100*beginners['blue'][1]/beginners['blue'][0], 2)}% of started games.\n")
-    print(f"On average, a game last {round(mean_run_time, 3)}s and is played in {mean_dice_rolls} dice rolls.\n")
+    print(f"On average, a game last {round(mean_run_time, 3)}s and is played in {round(mean_dice_rolls, 2)} dice rolls.\n")
     
 if __name__ == '__main__':
     main()
