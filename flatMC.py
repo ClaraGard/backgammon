@@ -33,6 +33,8 @@ def flatMC(board, dice, player, n):
     moves = Backgammon.legal_moves(board, dice, player)
     if len(moves) == 0:
         return []
+    elif len(moves) == 1:
+        return moves[0]
 
     for i in range(len(moves)):
         board_copy = copy.deepcopy(board)
