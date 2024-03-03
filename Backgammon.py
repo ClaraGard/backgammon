@@ -142,6 +142,130 @@ def legal_moves(board, dice, player):
             
     return moves
 
+def legal_moves2(board, dice, player):
+    # Essaye de faire les deux à la fois pour gagner du temps.
+    # Situation 1 : aucun pip en prison ne peut sortir
+    # Situation 2 : un pip en prison qui peut sortir. On commence par celui-là
+    #      puis on appelle legal_move sur l'autre dé.
+    # Situation 3 : finale : sum(board[7:25] > 0) == 0 
+    #       alors on sort ce que l'on peut sortir
+    # Situation 4 : pré-finale : sum(board[7:25] > 0) == 1
+    #       on regarde si on peut jouer d'abord le seul pip, puis legal_move sur l'autre dé
+    # Situation 5 : classique. On calcule les pips qui peuvent jouer le dé 1, puis
+    #       ceux qui peuvent jouer le dé 2.
+    #       On retourne alors tous les coups produit où ce ne sont pas les mêmes, ou bien
+    #       lorsqu'il y a au moins 2 jetons sur le même pip de départ
+    #       On rajoute enfin le cas où on déplace le même jeton sur les deux dés.
+    moves = []
+        
+    if player == 1:
+        # dead piece, needs to be brought back to life
+        if board[25] >= 1: # S'il y a au moins un pion à sortir
+            return(legal_moves(board, dice, player))
+        if sum(board[7:25] > 0) <= 1: # finale ou pre finale
+            return legal_moves(board,dice,player)
+        # On est donc dans la situation classique où il y a au moins deux pions
+        # dans la zone de mouvement.
+        # first dice:
+        possible_first_moves = legal_move(board, dice[0], player)
+        possible_second_moves = legal_move(board, dice[1], player)
+        # Il y aura d'autres moves si on bouge deux fois le même pion
+        # et on enlève du produit cartésien si c'est le même pion au début
+        if len(possible_first_moves) == 0:
+            return(legal_moves(board, dice, player))
+        if len(possible_second_moves) == 0:
+            return(legal_moves(board, dice, player))
+        # cas ou faire un des deux dés ouvre une possibilité auparavant inexistante pour l'autre dé
+        
+        if dice[0] != dice[1]:
+            # création du produit cartésien, possible car mouvement commute
+            for m1 in possible_first_moves:
+                for m2 in possible_second_moves:
+                    if m1[0] != m2[0] or board[m1[0]] >= 2:
+                        moves.append([m1, m2])
+            for m1 in possible_first_moves:
+                if board[m1[1]] < 1: # nouvel endroit car sinon mouv déjà créer par legal moves
+                    end_pip = m1[1] - dice[1]
+                    if end_pip > 0:
+                        if board[end_pip] > -2:
+                            moves.append([m1, [m1[1], end_pip]])
+            for m1 in possible_second_moves:
+                if board[m1[1]] < 1:
+                    end_pip = m1[1] - dice[0]
+                    if end_pip > 0:
+                        if board[end_pip] > -2:
+                            moves.append([m1, [m1[1], end_pip]])
+        # produit parfois quelques résultats équivalents (mais pas redondants)
+        # redondant : faire 8 -> 4 puis 6 -> 3 et faire 6 -> 3 puis 8 -> 4
+        # equivalent : donne le meme board mais les coups sont différents
+        else: # produit cartésien différent (dés: 3, 4. 6 -> 3, 8 -> 4 et 8 -> 4, 6 -> 3 différent, mais pas si dés égaux)
+            n = len(possible_first_moves)
+            for i in range(n):
+                for j in range(i, n): #  
+                    m1 = possible_first_moves[i]
+                    m2 = possible_first_moves[j]
+                    if m1[0] != m2[0] or board[m1[0]] >= 2:
+                        moves.append([m1, m2])
+            for m1 in possible_first_moves:
+                if board[m1[1]] < 1:
+                    end_pip = m1[1] - dice[1]
+                    if end_pip > 0:
+                        if board[end_pip] > -2:
+                            moves.append([m1, [m1[1], end_pip]])
+
+    
+    if player == -1:
+        # dead piece, needs to be brought back to life
+        if board[26] <= -1: # S'il y a au moins un pion à sortir
+            return(legal_moves(board,dice,player))
+        if sum(board[1:19] < 0) <= 1:
+            return legal_moves(board,dice,player)
+        # On est donc dans la situation classique où il y a au moins deux pions
+        # dans la zone de mouvement.
+        # first dice:
+        possible_first_moves = legal_move(board, dice[0], player)
+        possible_second_moves = legal_move(board, dice[1], player)
+        # Il y aura d'autres moves si on bouge deux fois le même pion
+        # et on enlève du produit cartésien si c'est le même pion au début
+        if len(possible_first_moves) == 0:
+            return(legal_moves(board, dice, player))
+        if len(possible_second_moves) == 0:
+            return(legal_moves(board, dice, player))
+        
+        if dice[0] != dice[1]:
+            for m1 in possible_first_moves:
+                for m2 in possible_second_moves:
+                    if m1[0] != m2[0] or board[m1[0]] <= -2:
+                        moves.append([m1, m2])
+            for m1 in possible_first_moves:
+                if board[m1[1]] > -1:
+                    end_pip = m1[1] + dice[1]
+                    if end_pip < 25:
+                        if board[end_pip] < 2:
+                            moves.append([m1, [m1[1], end_pip]])
+            for m1 in possible_second_moves:
+                if board[m1[1]] >- 1:
+                    end_pip = m1[1] + dice[0]
+                    if end_pip < 25:
+                        if board[end_pip] <2:
+                            moves.append([m1, [m1[1], end_pip]])
+        else:
+            n = len(possible_first_moves)
+            for i in range(n):
+                for j in range(i, n):
+                    m1 = possible_first_moves[i]
+                    m2 = possible_first_moves[j]
+                    if m1[0] != m2[0] or board[m1[0]] <= -2:
+                        moves.append([m1, m2])
+            for m1 in possible_first_moves:
+                if board[m1[1]] >- 1:
+                    end_pip = m1[1] + dice[1]
+                    if end_pip < 25:
+                        if board[end_pip] < 2:
+                            moves.append([m1, [m1[1], end_pip]])
+
+    return moves
+
 def update_board(board, move, player):
     # updates the board (play a move)
 
@@ -195,7 +319,14 @@ def play_a_game(winners, nb_legal_moves = {}):
         for _ in range(1 + int(dice[0] == dice[1])):
             board_copy = np.copy(board) 
 
-            possible_moves = legal_moves(board_copy, dice, player)
+            possible_moves = legal_moves2(board_copy, dice, player)
+            # pm2 = legal_moves(board_copy, dice, player)
+            # if not compare(possible_moves, pm2):
+            #     print(f"C'est au coup {dice_rolls}, les des ont donné {dice}\n")
+            #     pretty_print(board)
+            #     print(possible_moves)
+            #     print(pm2)
+            #     print("\n\n")
 
             # Study of the distribution of number of legal moves
             # nb_moves = len(possible_moves)
@@ -287,6 +418,46 @@ def main():
     print(f"Player blue won {winners['blue'][1]} 1-point plays, {winners['blue'][2]} 2-point plays " \
           f"and {winners['blue'][3]} 3-point plays.\n")
     print(f"On average, a game last {round(mean_run_time, 3)}s and is played in {round(mean_dice_rolls, 2)} dice rolls.\n")
-    
+
+# def compare(L1,L2):
+#     for x in L1:
+#         ok=False
+#         for y in L2:
+#             if len(x)==len(y):
+#                 if len(x)==1:
+#                     if list(x[0])==list(y[0]):
+#                         ok=True
+#                 else:
+#                     cx1,cx2=list(x[0]), list(x[1])
+#                     cy1,cy2=list(y[0]), list(y[1])
+#                     if cx1==cy1 and cx2==cy2:
+#                         ok=True
+#                     if cx1==cy2 and cx2==cy1:
+#                         ok=True
+#         if not ok:
+#             print(f"{x} n'est pas trouvé dans la deuxième liste")
+#             return False
+#     for x in L2:
+#         ok=False
+#         for y in L1:
+#             if len(x)==len(y):
+#                 if len(x)==1:
+#                     if list(x[0])==list(y[0]):
+#                         ok=True
+#                 else:
+#                     cx1,cx2=list(x[0]), list(x[1])
+#                     cy1,cy2=list(y[0]), list(y[1])
+#                     if cx1==cy1 and cx2==cy2:
+#                         ok=True
+#                     if cx1==cy2 and cx2==cy1:
+#                         ok=True
+#         if not ok:
+#             print(f"{x} n'est pas trouvé dans la première liste")
+#             return False
+#     return True
+
 if __name__ == '__main__':
     main()
+
+
+
