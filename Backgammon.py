@@ -268,7 +268,6 @@ def legal_moves2(board, dice, player):
 
 def update_board(board, move, player):
     # updates the board (play a move)
-
     board_to_update = copy.deepcopy(board) 
 
     startPip = move[0]
@@ -319,7 +318,7 @@ def play_a_game(winners, nb_legal_moves = {}):
         for _ in range(1 + int(dice[0] == dice[1])):
             board_copy = np.copy(board) 
 
-            possible_moves = legal_moves2(board_copy, dice, player)
+            possible_moves = legal_moves(board_copy, dice, player)
             # pm2 = legal_moves(board_copy, dice, player)
             # if not compare(possible_moves, pm2):
             #     print(f"C'est au coup {dice_rolls}, les des ont donné {dice}\n")
@@ -375,6 +374,13 @@ def play_a_game(winners, nb_legal_moves = {}):
             winners["blue"][3] += 1       
        
     return winners, dice_rolls/2, nb_legal_moves
+
+def getboard_code(seen_boards, board, dice):
+    strboard = str(board)+str(dice)
+    if not strboard in seen_boards:
+        seen_boards[strboard] = len(seen_boards)
+    board_number = seen_boards[strboard]
+    return board_number
     
 def main():
     games = 100
@@ -384,7 +390,8 @@ def main():
     mean_run_time = 0
     nb_legal_moves = {}
     
-    for _ in range(games):
+    for i in range(games):
+        print(i)
         startTime = time.time()
 
         winners, dice_rolls, nb_legal_moves = play_a_game(winners, nb_legal_moves)

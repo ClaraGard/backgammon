@@ -66,8 +66,8 @@ def flatMC(board, dice, player, n):
     return moves[bestMove]
     
 def main():
-    N = 1000
-    games = 100
+    N = 50
+    games = 1
 
     winners = {"flatMC": [0, 0, 0, 0], "random": [0, 0, 0, 0]}
     mean_dice_rolls = 0

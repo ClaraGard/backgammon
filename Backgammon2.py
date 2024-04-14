@@ -10,50 +10,47 @@ import matplotlib.pyplot as plt
 import time
 import random
 import copy
+from numba import jit
 
 class Player:
-    def __init__(self, name, id, jail, passed, start, goal):
+    def __init__(self, name, id, jail, passed, start, goal, reverse_sort):
         self.name = name
         self.id = id
         self.jail = jail
         self.passed = passed
         self.start = start
         self.goal = goal
+        self.reverse_sort = reverse_sort
         self.opponent :Player = None
-        self.checkers = None
 
-BLACK = Player("BLACK", 1, 25, 27, -1, 24)
-WHITE = Player("WHITE", -1, 24, 26, 24, -1)
+BLACK = Player("BLACK", 1, 25, 27, -1, 24, False)
+WHITE = Player("WHITE", -1, 24, 26, 24, -1, True)
 BLACK.opponent = WHITE
 WHITE.opponent = BLACK
 
-
 class BackGammon:
-    def __init__(self, black :Player, white :Player, board=None, blackCheckers=None, whiteCheckers=None):
+    def __init__(self, board=None, checkers = None):
         if board is not None:
-            assert blackCheckers is not None and whiteCheckers is not None
+            assert checkers is not None
             self.board = copy.deepcopy(board)
-            self.blackCheckers = copy.deepcopy(blackCheckers)
-            self.whiteCheckers = copy.deepcopy(whiteCheckers)
+            self.checkers = copy.deepcopy(checkers)
         else:
             self.init_board()
-        
-        black.checkers = self.blackCheckers
-        white.checkers = self.whiteCheckers
 
     def init_board(self):
         # initializes the game board
+        self.checkers = {}
         self.board = [0] * 28
         self.board[0] = 2
         self.board[11] = 5
         self.board[16] = 3
         self.board[18] = 5
-        self.blackCheckers = [0, 11, 16, 18]
+        self.checkers[BLACK.id] = [0, 11, 16, 18]
         self.board[5] = -5
         self.board[7] = -3
         self.board[12] = -5
         self.board[23] = -2
-        self.whiteCheckers = [23, 12, 7, 5]
+        self.checkers[WHITE.id] = [23, 12, 7, 5]
 
     def game_over(self):
     # returns True if the game is over   
@@ -70,8 +67,7 @@ class BackGammon:
         print(self.board[0:12])
         print(self.board[23:11:-1])
         print(self.board[24:28])
-        print(self.blackCheckers)
-        print(self.whiteCheckers)
+        print(self.checkers)
         print("")
 
     @staticmethod
@@ -84,8 +80,8 @@ class BackGammon:
 
     def is_bearing_off(self, player :Player):
         if player == WHITE:
-            return self.whiteCheckers[0] < 6
-        return self.blackCheckers[0] > 17
+            return self.checkers[WHITE.id][0] < 6
+        return self.checkers[BLACK.id][0] > 17
 
     def has_checkers_in_jail(self, player :Player):
         return self.board[player.jail]*player.id > 0
@@ -108,20 +104,23 @@ class BackGammon:
     def get_bearing_off_moves(self, player :Player, die):
         #if there is a checker exactly on the die number
         if self.can_win(player, die):
-            return [(-player.id*die)+player.goal, player.goal]
-        elif not self.game_over(): # smá fix
-            # everybody's past the dice throw?
-            #self.whiteCheckers[0] is the farthest white checkers from the end
-            if ((player.checkers[0] + player.id * die) -player.goal)*player.id >= 0:
-                return [player.checkers[0], player.passed]
+            return self.get_trivial_win_move(player, die)
+        return self.get_other_win_move(player, die)
+    
+    def get_trivial_win_move(self, player :Player, die):
+        return [(-player.id*die)+player.goal, player.passed]
+    
+    def get_other_win_move(self, player :Player, die):
+        if ((self.checkers[player.id][0] + player.id * die) -player.goal)*player.id >= 0:
+            return [self.checkers[player.id][0], player.passed]
         return None
-
+    
     def get_other_moves(self, player :Player, die):
         possible_moves = []
         # finding all other legal options
         if self.can_win(player, die):
             return []
-        for start in player.checkers:
+        for start in self.checkers[player.id]:
             destination = start+die*player.id
             if destination >= 0 and destination < 24:
                 if self.can_go(player, destination):
@@ -131,118 +130,123 @@ class BackGammon:
 
     def legal_move(self, player :Player, die):
         # finds legal moves (from, to) for a board and one dice, returns empty list if none
-        possible_moves = []
         if self.has_checkers_in_jail(player): 
-            return self.get_jail_move(player, die)
+            return [self.get_jail_move(player, die)]
         if self.is_bearing_off(player):
-            possible_moves = self.get_bearing_off_moves(player, die)
-        possible_moves.extend(self.get_other_moves(player, die))
-        return possible_moves     
+            bearing_off_move = self.get_bearing_off_moves(player, die)
+            if bearing_off_move:
+                return [bearing_off_move]
+        return self.get_other_moves(player, die)
 
     def play(self, player :Player, move):
+        if not move: return
         start = move[0]
         dest = move[1]
         # moving the dead piece if the move kills a piece
         if self.board[dest] == (player.opponent.id):
             self.board[player.opponent.jail] += player.opponent.id
             self.board[dest] = 0
-            player.opponent.checkers.remove(dest)
+            self.checkers[-player.id].remove(dest)
 
         self.board[start] -= player.id
-        if self.board[start] == 0:
-            if player==WHITE:
-                self.whiteCheckers.remove(start)
-            if player==BLACK:
-                self.blackCheckers.remove(start)
+        if self.board[start] == 0 and start < 24:
+            self.checkers[player.id].remove(start)
 
         if not self.has_checker_in_case(player, dest) and dest < 24:
-            if player==WHITE:
-                self.whiteCheckers.append(dest)
-                self.whiteCheckers.sort(reverse=True)
-            if player==BLACK:
-                self.blackCheckers.append(dest)
-                self.blackCheckers.sort(reverse=False)
+            self.checkers[player.id].append(dest)
+            self.checkers[player.id].sort(reverse = player.reverse_sort)
         
         self.board[dest] += player.id
         npboard = np.array(self.board[0:24])
+        npboard2 = np.array(self.board)
         bc = np.where(npboard>0)[0]
         wc = np.sort(np.where(npboard<0)[0])[::-1]
-        assert bc.tolist() == self.blackCheckers and wc.tolist() == self.whiteCheckers, \
-        str(bc) + str(self.blackCheckers) +"\n" + str(wc) + str(self.whiteCheckers) +"\n"+ str(self.board) + "\n"+ str(move)
+        #print(str(bc) + str(self.checkers[BLACK.id]) +"\n" + str(wc) + str(self.checkers[WHITE.id]) +"\n"+ str(self.board) + "\n"+ str(move))
+        assert sum(npboard2[npboard2 > 0]) == 15 and sum(npboard2[npboard2 < 0]) == -15, \
+        str(bc) + str(self.checkers[BLACK.id]) +"\n" + str(wc) + str(self.checkers[WHITE.id]) +"\n"+ str(self.board) + "\n"+ str(move)
+        assert bc.tolist() == self.checkers[BLACK.id] and wc.tolist() == self.checkers[WHITE.id], \
+        str(bc) + str(self.checkers[BLACK.id]) +"\n" + str(wc) + str(self.checkers[WHITE.id]) +"\n"+ str(self.board) + "\n"+ str(move)
 
 
     def legal_moves(self, player :Player, dice):
         moves = []
-        if self.has_mandatory_action(player, dice[0]):
-            if self.has_checkers_in_jail(player):
-                jail_move = self.get_jail_move(player, dice[0])
-                if jail_move is not None:
-                    game_after_move = BackGammon(BLACK, WHITE, self.board, self.blackCheckers, self.whiteCheckers)
-                    game_after_move.play(player, jail_move)
-                    for lm in game_after_move.legal_move(player, dice[1]):
-                        moves.append([jail_move, lm])
-            #canwin
-            else:
-                win_move = self.get_bearing_off_moves(player, dice[0])
-                game_after_move = BackGammon(BLACK, WHITE, self.board, self.blackCheckers, self.whiteCheckers)
-                game_after_move.play(player, win_move)
+        bearing_off_move = self.get_bearing_off_moves(player, dice[0])
+        if self.has_checkers_in_jail(player):
+            jail_move = self.get_jail_move(player, dice[0])
+            if jail_move is not None:
+                game_after_move = BackGammon(self.board, self.checkers)
+                game_after_move.play(player, jail_move)
                 for lm in game_after_move.legal_move(player, dice[1]):
-                    moves.append([win_move, lm])
+                    moves.append([jail_move, lm])
+        #canwin
+        elif bearing_off_move:
+            game_after_move = BackGammon(self.board, self.checkers)
+            game_after_move.play(player, bearing_off_move)
+            if not game_after_move.game_over():
+                for lm in game_after_move.legal_move(player, dice[1]):
+                    moves.append([bearing_off_move, lm])
+            else:
+                moves.append([bearing_off_move, None])
         else:
             other_moves = self.get_other_moves(player, dice[0])
             other_moves2 = self.get_other_moves(player, dice[1])
             for m in other_moves:
-                game_after_move = BackGammon(BLACK, WHITE, self.board, self.blackCheckers, self.whiteCheckers)
+                game_after_move = BackGammon(self.board, self.checkers)
                 game_after_move.play(player, m)
                 destination = m[1]+dice[1]*player.id
-                if game_after_move.can_win(player, dice[1]):
-                    moves.append([m, game_after_move.get_bearing_off_moves(player, dice[1])])
+                bearing_off_move = game_after_move.get_bearing_off_moves(player, dice[1])
+                if bearing_off_move:
+                    moves.append([m, bearing_off_move])
                 elif destination >= 0 and destination < 24 and game_after_move.can_go(player, destination):
                     moves.append([m, [m[1], destination]])
-                for m2 in other_moves2:
-                    moves.append([m, m2])
+                if not bearing_off_move:
+                    for m2 in other_moves2:
+                        if game_after_move.has_checker_in_case(player, m2[0]):
+                            moves.append([m, m2])
 
         if dice[0] != dice[1]:
-            if self.has_mandatory_action(player, dice[1]):
-                if self.has_checkers_in_jail(player):
-                    jail_move = self.get_jail_move(player, dice[1])
-                    if jail_move is not None:
-                        game_after_move = BackGammon(BLACK, WHITE, self.board, self.blackCheckers, self.whiteCheckers)
-                        game_after_move.play(player, jail_move)
-                        for lm in game_after_move.legal_move(player, dice[0]):
-                            moves.append([jail_move, lm])
-                #canwin
-                else:
-                    win_move = self.get_bearing_off_moves(player, dice[1])
-                    game_after_move = BackGammon(BLACK, WHITE, self.board, self.blackCheckers, self.whiteCheckers)
-                    game_after_move.play(player, win_move)
+            bearing_off_move = self.get_bearing_off_moves(player, dice[1])
+            if self.has_checkers_in_jail(player):
+                jail_move = self.get_jail_move(player, dice[1])
+                if jail_move is not None:
+                    game_after_move = BackGammon(self.board, self.checkers)
+                    game_after_move.play(player, jail_move)
                     for lm in game_after_move.legal_move(player, dice[0]):
-                        moves.append([win_move, lm])
-            else:
-                other_moves = self.get_other_moves(player, dice[0])
-                for m in other_moves:
-                    game_after_move = BackGammon(BLACK, WHITE, self.board, self.blackCheckers, self.whiteCheckers)
-                    game_after_move.play(player, m)
-                    destination = m[1]+dice[1]*player.id
-                    if game_after_move.can_win(player, dice[1]):
-                        moves.append([m, game_after_move.get_bearing_off_moves(player, dice[1])])
-                    elif destination >= 0 and destination < 24 and game_after_move.can_go(player, destination):
-                        moves.append([m, [m[1], destination]])
+                        moves.append([jail_move, lm])
+            #canwin
+            elif bearing_off_move:
+                game_after_move = BackGammon(self.board, self.checkers)
+                game_after_move.play(player, bearing_off_move)
+                if not game_after_move.game_over():
+                    for lm in game_after_move.legal_move(player, dice[0]):
+                        moves.append([bearing_off_move, lm])
+                else:
+                    moves.append([bearing_off_move, None])
+            other_moves = self.get_other_moves(player, dice[1])
+            for m in other_moves:
+                game_after_move = BackGammon(self.board, self.checkers)
+                game_after_move.play(player, m)
+                destination = m[1]+dice[1]*player.id
+                bearing_off_move = game_after_move.get_bearing_off_moves(player, dice[1])
+                if bearing_off_move:
+                    moves.append([m, bearing_off_move])
+                elif destination >= 0 and destination < 24 and game_after_move.can_go(player, destination):
+                    moves.append([m, [m[1], destination]])
         return moves
     
 def play_a_game(winners, nb_legal_moves = {}):
     # simulate a game with randomized moves
-    game = BackGammon(BLACK, WHITE)
+    game = BackGammon()
     player = BLACK
     dice_rolls = 0
-    game.pretty_print()
     while not game.game_over():
         dice = BackGammon.roll_dice()
         dice_rolls += 1
-        print("dice roll", dice)
-            
+        #print("dice roll", dice)
+        #print(game.board[BLACK.passed], game.board[WHITE.passed])
         # make a move (2 moves if the same number appears on the dice)
         for _ in range(1 + int(dice[0] == dice[1])):
+            if game.game_over(): break
             possible_moves = game.legal_moves(player, dice)
             # pm2 = legal_moves(board_copy, dice, player)
             # if not compare(possible_moves, pm2):
@@ -266,12 +270,11 @@ def play_a_game(winners, nb_legal_moves = {}):
             print(possible_moves)
             if len(possible_moves) != 0:
                 move = random.choice(possible_moves)
-                print(move)
+                #print(player.name, "plays", move)
                 for m in move:
-                    print(player.name, "plays", m, flush=True)
-                    print("")
+                    #print(player.name, "plays", m, flush=True)
                     game.play(player, m)
-            game.pretty_print()
+            #game.pretty_print()
 
         # players take turns 
         player = player.opponent
@@ -312,7 +315,8 @@ def main():
     mean_run_time = 0
     nb_legal_moves = {}
     
-    for _ in range(games):
+    for i in range(games):
+        print(i)
         startTime = time.time()
 
         winners, dice_rolls, nb_legal_moves = play_a_game(winners, nb_legal_moves)
