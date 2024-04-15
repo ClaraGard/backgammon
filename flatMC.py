@@ -28,7 +28,7 @@ def playout(board, dice, player):
 def flatMC(board, dice, player, n):
     bestScore = 0
     bestMove = 0
-    comparison = {} # study on opening move
+    #comparison = {} # study on opening move
 
     moves = Backgammon.legal_moves(board, dice, player)
     if len(moves) == 0:
@@ -50,18 +50,18 @@ def flatMC(board, dice, player, n):
                 sum += 1
         
         proba_victory = victory/(n)
-        comparison[str(moves[i])] = proba_victory
+        #comparison[str(moves[i])] = proba_victory
 
         if sum > bestScore:
             bestScore = sum
             bestMove = i
 
-    for move in comparison.keys(): # study on opening move
+    """for move in comparison.keys(): # study on opening move
         print(f"Move: {move}, proba:{comparison[move]}")
     values = comparison.values()
     dif = max(values) - min(values)
     l = len(values)
-    print(f"dice: {dice}, Diff: {dif}, len: {l}\n")
+    print(f"dice: {dice}, Diff: {dif}, len: {l}\n")"""
     
     return moves[bestMove]
     
@@ -69,7 +69,7 @@ def main():
     N = 50
     games = 1
 
-    winners = {"flatMC": [0, 0, 0, 0], "random": [0, 0, 0, 0]}
+    #winners = {"flatMC": [0, 0, 0, 0], "random": [0, 0, 0, 0]}
     mean_dice_rolls = 0
     mean_run_time = 0
 
@@ -96,6 +96,10 @@ def main():
                 if Backgammon.game_over(board):
                     break
 
+            if game_over(board):
+                player = -player
+                break
+    
             inp = input() # study on opening move
             player = -player
 
@@ -118,7 +122,7 @@ def main():
 
         winner = -player
         points = Backgammon.winner_gains(winner, board)
-        if winner == 1:
+        """if winner == 1:
             winners["flatMC"][0] += 1
             if points == 1:
                 winners["flatMC"][1] += 1
@@ -133,7 +137,7 @@ def main():
             elif points == -2:
                 winners["random"][2] += 1
             else:
-                winners["random"][3] += 1
+                winners["random"][3] += 1"""
 
     mean_dice_rolls = mean_dice_rolls//games
     mean_run_time = mean_run_time/games
@@ -141,12 +145,12 @@ def main():
     print(f"Out of {games} games between flatMC and random (N = {N}):\n")
     print(f"FlatMC won {winners['flatMC'][0]} times ({round(100*winners['flatMC'][0]/games, 2)}%) and won " \
           f"{winners['flatMC'][1] + winners['flatMC'][2]*2 + winners['flatMC'][3]*3} points.")
-    print(f"Random won {winners['random'][0]} times ({round(100*winners['random'][0]/games, 2)}%) and won " \
+    print(f"Random won {winners['random'][3]} times ({round(100*winners['random'][3]/games, 2)}%) and won " \
           f"{winners['random'][1] + winners['random'][2]*2 + winners['random'][3]*3} points.\n")
-    print(f"FlatMC won {winners['flatMC'][1]} 1-point plays, {winners['flatMC'][2]} 2-point plays " \
+    """print(f"FlatMC won {winners['flatMC'][1]} 1-point plays, {winners['flatMC'][2]} 2-point plays " \
           f"and {winners['flatMC'][3]} 3-point plays.")
     print(f"Random won {winners['random'][1]} 1-point plays, {winners['random'][2]} 2-point plays " \
-          f"and {winners['random'][3]} 3-point plays.\n")
+          f"and {winners['random'][3]} 3-point plays.\n")"""
     print(f"On average, a game last {round(mean_run_time, 3)}s and is played in {mean_dice_rolls} dice rolls.\n")
 
 if __name__ == '__main__':
