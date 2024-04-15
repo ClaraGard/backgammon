@@ -78,7 +78,6 @@ def bestHalf(board, dice, player, moves, nwins, nplayouts):
         half.append(bestMove)
     return half
 
-# to check
 def BestMoveHalving (board, dice, player, n, seen_boards):
     global Table
     Table = {}
