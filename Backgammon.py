@@ -375,8 +375,8 @@ def play_a_game(winners, nb_legal_moves = {}):
        
     return winners, dice_rolls/2, nb_legal_moves
 
-def getboard_code(seen_boards, board, dice):
-    strboard = str(board)+str(dice)
+def getboard_code(seen_boards, board, move):
+    strboard = str(board)+str(move)
     if not strboard in seen_boards:
         seen_boards[strboard] = len(seen_boards)
     board_number = seen_boards[strboard]
